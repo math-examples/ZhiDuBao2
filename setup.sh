@@ -72,7 +72,11 @@ if [ ! -f "js/main.js" ]; then
   exit 1
 fi
 
-# ✅ Deterministic esbuild (no sourcemap to avoid non-determinism)
+# Clean dist to prevent stale hash from old build
+rm -rf "${BUILD_DIR}"
+mkdir -p "${BUILD_DIR}/css"
+
+echo "📦 Building with esbuild..."
 npx esbuild js/main.js \
   --bundle \
   --minify \
@@ -81,8 +85,16 @@ npx esbuild js/main.js \
   --target=es2020 \
   --outfile="${BUILD_DIR}/main.js"
 
+# ✅ Freshness check
 if [ ! -f "${BUILD_DIR}/main.js" ]; then
   echo "❌ esbuild failed: ${BUILD_DIR}/main.js not produced" >&2
+  exit 1
+fi
+
+BUILD_TIME=$(stat -c %Y "${BUILD_DIR}/main.js" 2>/dev/null || stat -f %m "${BUILD_DIR}/main.js")
+SCRIPT_TIME=$(stat -c %Y "js/main.js" 2>/dev/null || stat -f %m "js/main.js")
+if [ "$BUILD_TIME" -lt "$SCRIPT_TIME" ]; then
+  echo "  ❌ dist/main.js is OLDER than js/main.js — build did not refresh!" >&2
   exit 1
 fi
 
@@ -137,8 +149,8 @@ sedi "s|gcore\.jsdelivr\.net/gh/[^']*@[^/]*/|gcore.jsdelivr.net/gh/${OWNER}/${RE
 sedi "s|fastly\.jsdelivr\.net/gh/[^']*@[^/]*/|fastly.jsdelivr.net/gh/${OWNER}/${REPO}@${VERSION}/|g" index.html
 
 # 4. Inject SRI hashes (only into final served files)
-sedi "\|<link rel=\"stylesheet\"| s|integrity=\"[^\"]*\"|integrity=\"${SRI_CSS_FULL}\"|" index.html
-sedi "\|<script type=\"module\"| s|integrity=\"[^\"]*\"|integrity=\"${SRI_MAIN_FULL}\"|" index.html
+sedi "/<link rel=\"stylesheet\"/,/crossorigin=/ s|integrity=\"[^\"]*\"|integrity=\"${SRI_CSS_FULL}\"|" index.html
+sedi "/src=[^>]*main\.js/,/crossorigin=/ s|integrity=\"[^\"]*\"|integrity=\"${SRI_MAIN_FULL}\"|" index.html
 
 # ============ VERIFY ============
 echo ""
