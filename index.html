@@ -1,16 +1,160 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome</title>
-  <style>
-    body { font-family: system-ui; max-width: 800px; margin: 4rem auto; padding: 0 2rem; }
-    h1 { color: #0969da; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="author" content="小洢工作室" />
+<meta name="copyright" content="© 小洢工作室. 保留所有权利." />
+<title>指读宝</title>
+<link rel="stylesheet"
+  href="https://cdn.jsdelivr.net/gh/math-examples/ZhiDuBao2@v1.0.0/dist/css/app.css"
+  integrity="sha384-0TG3+sWftmwb1MRvhJPuxgxaFB2umxGBMIBreNH2w4+nIhL5ulXUXaylJpW0Arq2"
+  crossorigin="anonymous"
+  onerror="this.href='https://gcore.jsdelivr.net/gh/math-examples/ZhiDuBao2@v1.0.0/dist/css/app.css'; this.onerror=function(){this.href='https://fastly.jsdelivr.net/gh/math-examples/ZhiDuBao2@v1.0.0/dist/css/app.css'}">
 </head>
 <body>
-  <h1>🚀 Site is live</h1>
-  <p>Push changes to this branch and GitHub Pages updates automatically.</p>
+<div class="box">
+
+  <div id="log">
+    <span class="log-text"></span>
+    <button class="fullscreen-btn" id="fs-toggle" title="Toggle Fullscreen" aria-label="Toggle Fullscreen">
+      <svg id="fs-icon-expand" viewBox="0 0 24 24"><path d="M16 3h3a2 2 0 0 1 2 2v3 M8 21H5a2 2 0 0 1-2-2v-3"/></svg>
+      <svg id="fs-icon-close" style="display:none;" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+
+  <div id="empty-state">
+    <svg class="empty-icon" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="emptyGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#007aff;stop-opacity:0.15"/><stop offset="100%" style="stop-color:#34c759;stop-opacity:0.15"/></linearGradient></defs>
+      <circle cx="32" cy="32" r="30" fill="url(#emptyGrad)"/>
+      <path d="M14 16 L14 46 Q14 48 16 48 L30 48 Q32 48 32 46 L32 16 Q32 14 30 14 L16 14 Q14 14 14 16 Z" fill="#007aff" opacity="0.8"/>
+      <path d="M50 16 L50 46 Q50 48 48 48 L34 48 Q32 48 32 46 L32 16 Q32 14 34 14 L48 14 Q50 14 50 16 Z" fill="#34c759" opacity="0.7"/>
+      <rect x="31" y="14" width="2" height="34" rx="0.5" fill="currentColor" opacity="0.3"/>
+      <text x="32" y="36" text-anchor="middle" font-size="18" fill="#fff" font-weight="700">?</text>
+    </svg>
+    No text loaded.<br>
+    Use <code>?href=https://example.com/text.txt</code> in the URL to load a text file.
+  </div>
+
+  <div class="row" id="editor-controls">
+    <button id="bgCycle" class="secondary" style="padding:6px 10px;font-size:15px;min-width:auto;">☀️</button>
+    <select id="voiceSelect"></select>
+    <button id="showAllVoices" class="secondary" style="padding: 6px 10px; font-size: 13px; min-width: 60px;">🌐 All</button>
+    <button id="about-btn" class="secondary" style="padding: 6px 10px; font-size: 13px; min-width: 60px; margin-left: auto;">📋 简介</button>
+  </div>
+  <div class="row" id="editor-controls2">
+    <div class="bub-row">
+      <span class="bub-label">语速</span>
+      <div class="bub-wrap">
+        <div class="bub-track" id="rateTrack">
+          <div class="bub-fill" id="rateFill"></div>
+          <div class="bub-thumb" id="rateThumb"></div>
+          <div class="bub-bubble" id="rateBubble"></div>
+        </div>
+      </div>
+      <span class="bub-value" id="rateVal">1.0</span>
+      <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1" style="display:none;" />
+    </div>
+    <div class="bub-row">
+      <span class="bub-label">音调</span>
+      <div class="bub-wrap">
+        <div class="bub-track" id="pitchTrack">
+          <div class="bub-fill" id="pitchFill"></div>
+          <div class="bub-thumb" id="pitchThumb"></div>
+          <div class="bub-bubble" id="pitchBubble"></div>
+        </div>
+      </div>
+      <span class="bub-value" id="pitchVal">1.0</span>
+      <input type="range" id="pitch" min="0" max="2" step="0.1" value="1" style="display:none;" />
+    </div>
+  </div>
+  <div class="row" id="main-buttons">
+    <button id="toggle">▶ Read</button>
+    <button id="paste" class="secondary">📋 粘贴</button>
+    <button id="edit-toggle" class="secondary">✏️ 编辑</button>
+    <input type="file" id="fileInput" accept=".txt" style="display:none;" />
+  </div>
+  <div class="row" id="reader-controls">
+    <button id="toggle-reader">▶ Read</button>
+    <button id="back" class="secondary">✏️ 编辑</button>
+  </div>
+  <div id="editor">
+    <textarea id="text" placeholder="Type or paste text here to read aloud…"></textarea>
+  </div>
+  <div id="reader"></div>
+
+  <div class="footer-copy">
+    © <span id="copyright-year-footer"></span> 小洢工作室. 保留所有权利.
+  </div>
+</div>
+
+<div id="about-overlay">
+  <div id="about-card">
+    <div class="logo-wrap">
+      <svg class="logo-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#007aff;stop-opacity:0.15"/><stop offset="100%" style="stop-color:#34c759;stop-opacity:0.15"/></linearGradient>
+          <linearGradient id="hairGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#5a3e1b"/><stop offset="100%" style="stop-color:#8b6914"/></linearGradient>
+          <linearGradient id="dressGrad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#ff6b9d;stop-opacity:0.8"/><stop offset="100%" style="stop-color:#ff3b6e;stop-opacity:0.9"/></linearGradient>
+        </defs>
+        <circle cx="32" cy="32" r="30" fill="url(#bgGrad)"/>
+        <ellipse cx="32" cy="14" rx="12" ry="10" fill="url(#hairGrad)"/>
+        <path d="M20 16 Q18 28 20 38 Q22 30 24 20 Z" fill="url(#hairGrad)" opacity="0.8"/>
+        <path d="M44 16 Q46 28 44 38 Q42 30 40 20 Z" fill="url(#hairGrad)" opacity="0.8"/>
+        <ellipse cx="32" cy="26" rx="10" ry="9" fill="#ffe0c4"/>
+        <ellipse cx="28" cy="25" rx="2" ry="2.5" fill="#333"/><ellipse cx="36" cy="25" rx="2" ry="2.5" fill="#333"/>
+        <circle cx="28.5" cy="24.5" r="0.8" fill="#fff"/><circle cx="36.5" cy="24.5" r="0.8" fill="#fff"/>
+        <ellipse cx="26" cy="28" rx="2.5" ry="1.5" fill="#ff6b9d" opacity="0.3"/><ellipse cx="38" cy="28" rx="2.5" ry="1.5" fill="#ff6b9d" opacity="0.3"/>
+        <path d="M29 30 Q32 32 35 30" stroke="#ff6b9d" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <path d="M24 36 Q22 44 20 52 L44 52 Q42 44 40 36 Z" fill="url(#dressGrad)"/>
+        <path d="M28 36 L32 40 L36 36" stroke="#fff" stroke-width="1" fill="none" opacity="0.6"/>
+        <rect x="22" y="42" width="20" height="14" rx="2" fill="#007aff" opacity="0.9"/>
+        <rect x="22" y="42" width="10" height="14" rx="1" fill="#34c759" opacity="0.7"/>
+        <line x1="32" y1="42" x2="32" y2="56" stroke="#fff" stroke-width="0.5" opacity="0.5"/>
+        <line x1="46" y1="38" x2="52" y2="32" stroke="#ffd700" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="52" cy="32" r="2" fill="#ffd700"><animate attributeName="r" values="2;3;2" dur="1.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.8;1;0.8" dur="1.5s" repeatCount="indefinite"/></circle>
+        <path d="M14 28 Q11 32 14 36" stroke="#007aff" stroke-width="1.5" fill="none" opacity="0.6" stroke-linecap="round"/>
+        <path d="M11 25 Q7 32 11 39" stroke="#007aff" stroke-width="1" fill="none" opacity="0.3" stroke-linecap="round"/>
+      </svg>
+      <div class="logo-text-group"><h2>指读宝</h2><div class="version">v1.0 · 指尖点读神器</div></div>
+    </div>
+    <div class="desc">不用买点读笔，打开指读宝，手指长按任意单词就能听到标准发音。像拥有了一支点读笔，但只需要你的手指。</div>
+    <ul class="feature-list">
+      <li>长按单词即时发音，标准语音引擎</li>
+      <li>一键整段朗读，逐段高亮跟随</li>
+      <li>长按自动弹出 Bing / Cambridge / 有道词典</li>
+      <li>语速、音调自由调节，适配不同学习场景</li>
+      <li>支持文本输入与剪贴板粘贴</li>
+      <li>自动匹配系统语言，支持全球多种语音</li>
+    </ul>
+    <div class="how-to"><strong>使用方式：</strong><br>1. 在文本框中输入或粘贴英文内容<br>2. 点击「▶ Read」开始整段朗读<br>3. 在阅读模式中长按任意单词即可发音</div>
+    <div id="modeSwitchLink" style="text-align:center; margin-bottom:12px;"></div>
+    <div class="icon-row">
+      <svg class="mini-icon" viewBox="0 0 36 36"><path d="M6 8 L6 30 Q6 31 7 31 L17 31 Q18 31 18 30 L18 8 Q18 7 17 7 L7 7 Q6 7 6 8 Z" fill="#007aff" opacity="0.8"/><path d="M30 8 L30 30 Q30 31 29 31 L19 31 Q18 31 18 30 L18 8 Q18 7 19 7 L29 7 Q30 7 30 8 Z" fill="#34c759" opacity="0.8"/><rect x="17" y="7" width="2" height="24" rx="0.5" fill="currentColor" opacity="0.3"/></svg>
+      <svg class="mini-icon" viewBox="0 0 36 36"><rect x="13" y="6" width="10" height="16" rx="5" fill="#ff6b9d" opacity="0.85"/><path d="M9 18 Q9 24 18 24 Q27 24 27 18" stroke="#ff6b9d" stroke-width="2" fill="none" stroke-linecap="round"/><line x1="18" y1="24" x2="18" y2="28" stroke="#ff6b9d" stroke-width="2" stroke-linecap="round"/><line x1="14" y1="28" x2="22" y2="28" stroke="#ff6b9d" stroke-width="2" stroke-linecap="round"/></svg>
+      <svg class="mini-icon" viewBox="0 0 36 36"><path d="M18 4 L21 14 L31 17 L21 20 L18 30 L15 20 L5 17 L15 14 Z" fill="#ffd700" opacity="0.9"/><circle cx="18" cy="17" r="2" fill="#fff" opacity="0.5"/></svg>
+      <svg class="mini-icon" viewBox="0 0 36 36"><path d="M18 32 C18 32 6 24 6 14 C6 8 12 4 18 9 C24 4 30 8 30 14 C30 24 18 32 18 32 Z" fill="#ff3b6e" opacity="0.85"/></svg>
+    </div>
+    <div class="studio">
+      <svg class="studio-logo" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+        <defs><linearGradient id="studioGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#ff6b9d"/><stop offset="100%" style="stop-color:#af52de"/></linearGradient></defs>
+        <circle cx="14" cy="14" r="13" fill="url(#studioGrad)" opacity="0.15"/>
+        <circle cx="14" cy="12" r="7" fill="url(#studioGrad)" opacity="0.7"/>
+        <path d="M7 6 L10 9 L8 4 Z" fill="#ff3b6e"/><path d="M21 6 L18 9 L20 4 Z" fill="#ff3b6e"/>
+        <circle cx="11.5" cy="12" r="1.2" fill="#fff"/><circle cx="16.5" cy="12" r="1.2" fill="#fff"/>
+        <path d="M11 15 Q14 17 17 15" stroke="#fff" stroke-width="1" fill="none" stroke-linecap="round"/>
+      </svg>
+      <span><strong>小洢工作室</strong><br>© <span id="copyright-year-about"></span> 保留所有权利</span>
+    </div>
+    <button id="about-close">关闭</button>
+  </div>
+</div>
+
+<script type="module"
+  src="https://cdn.jsdelivr.net/gh/math-examples/ZhiDuBao2@v1.0.0/dist/main.js"
+  integrity="sha384-ir0D9GhoAV+kY20ZG0BUWLs7vW4EXoTE6x9EbptyNtnxqIOOfq2Fn6BeO/nFqzFn"
+  crossorigin="anonymous"
+  onerror="this.src='https://gcore.jsdelivr.net/gh/math-examples/ZhiDuBao2@v1.0.0/dist/main.js'; this.onerror=function(){this.src='https://fastly.jsdelivr.net/gh/math-examples/ZhiDuBao2@v1.0.0/dist/main.js'}">
+</script>
 </body>
 </html>

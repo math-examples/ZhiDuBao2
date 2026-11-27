@@ -1,0 +1,28 @@
+export const State = {
+  paragraphs: [],
+  currentIndex: 0,
+  isPlaying: false,
+  warmed: false,
+  speakTimer: null,
+  runId: 0,
+  voices: [],
+  userHasPickedVoice: false,
+  userSelectedVoiceRef: null,
+  autoSelectDone: false,
+  autoSelectRetries: 0,
+  MAX_AUTO_RETRIES: 8,
+  longPressTimer: null,
+  longPressFired: false,
+  wordUtterance: null,
+  wordHighlightMark: null,
+  fsEverClicked: false,
+  logResizeObserver: null,
+  lastScrollTop: 0,
+  barVisible: true,
+  hideTimer: null,
+  clearLogTimer: null,
+  urlParams: new URLSearchParams(window.location.search),
+
+  isHrefMode() { return this.urlParams.has('href'); },
+  isFileMode() { return this.urlParams.get('file') === '1'; }
+};
