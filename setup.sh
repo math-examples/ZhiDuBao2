@@ -137,8 +137,8 @@ sedi "s|gcore\.jsdelivr\.net/gh/[^']*@[^/]*/|gcore.jsdelivr.net/gh/${OWNER}/${RE
 sedi "s|fastly\.jsdelivr\.net/gh/[^']*@[^/]*/|fastly.jsdelivr.net/gh/${OWNER}/${REPO}@${VERSION}/|g" index.html
 
 # 4. Inject SRI hashes (only into final served files)
-sedi "/<link rel=\"stylesheet\"/,/crossorigin=/ s|integrity=\"[^\"]*\"|integrity=\"${SRI_CSS_FULL}\"|" index.html
-sedi "/src=[^>]*main\.js/,/crossorigin=/ s|integrity=\"[^\"]*\"|integrity=\"${SRI_MAIN_FULL}\"|" index.html
+sedi "\|<link rel=\"stylesheet\"| s|integrity=\"[^\"]*\"|integrity=\"${SRI_CSS_FULL}\"|" index.html
+sedi "\|<script type=\"module\"| s|integrity=\"[^\"]*\"|integrity=\"${SRI_MAIN_FULL}\"|" index.html
 
 # ============ VERIFY ============
 echo ""
