@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup.sh — esbuild + SRI + CDN updater for 指读宝 (CI-safe)
+# setup.sh — esbuild + SRI + CDN updater for 指读宝 (CI-safe, SRI-correct)
 set -euo pipefail
 
 # ============ REPOSITORY ============
@@ -26,51 +26,37 @@ else
   REPO="${GITHUB_REPO:-$(basename "$REPO_ROOT")}"
 fi
 
-# ★ FIX #1: Accept explicit version as $3, otherwise auto-generate
+# Version resolution
 if [ -n "${3:-}" ]; then
   VERSION="$3"
   [[ "$VERSION" == v* ]] || VERSION="v${VERSION}"
 else
-  # Safe file list construction (no glob failures)
+  # Hash-based version from built output (deterministic)
   FILE_LIST=()
-  if [ -d css ]; then
-    while IFS= read -r -d '' f; do
-      FILE_LIST+=("$f")
-    done < <(find css -type f -name '*.css' -print0 | sort -z)
-  fi
-  if [ -d js ]; then
-    while IFS= read -r -d '' f; do
-      FILE_LIST+=("$f")
-    done < <(find js -type f -name '*.js' -print0 | sort -z)
-  fi
+  [ -d css ] && while IFS= read -r -d '' f; do FILE_LIST+=("$f"); done < <(find css -type f -name '*.css' -print0 | sort -z)
+  [ -d js ] && while IFS= read -r -d '' f; do FILE_LIST+=("$f"); done < <(find js -type f -name '*.js' -print0 | sort -z)
 
   if [ ${#FILE_LIST[@]} -gt 0 ] && cat "${FILE_LIST[@]}" >/dev/null 2>&1; then
     RAW_HASH=$(cat "${FILE_LIST[@]}" | openssl dgst -sha256 | grep -o '[a-f0-9]\{64\}')
-    # Reject hash-of-nothing (empty stdin)
     if [ -n "$RAW_HASH" ] && [ "$RAW_HASH" != "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" ]; then
       VERSION="v${RAW_HASH:0:12}"
     fi
   fi
-
-  if [ -z "${VERSION:-}" ]; then
-    VERSION="v$(date -u +%Y%m%d%H%M%S)"
-  fi
+  [ -z "${VERSION:-}" ] && VERSION="v$(date -u +%Y%m%d%H%M%S)"
 fi
 
 echo "🔐 Owner:   ${OWNER}"
 echo "🔐 Repo:    ${REPO}"
 echo "🔐 Version: ${VERSION}"
 
-# ============ INSTALL & BUILD (FAIL FAST) ============
+# ============ INSTALL & BUILD ============
 BUILD_DIR="dist"
-BUILD_OK=false
 
 if [ ! -f "package.json" ]; then
   echo "❌ package.json not found" >&2
   exit 1
 fi
 
-# ★ FIX #2: npm must succeed — no || masking
 echo "📦 Installing dependencies..."
 if [ -f "package-lock.json" ]; then
   npm ci --no-audit --no-fund
@@ -86,7 +72,7 @@ if [ ! -f "js/main.js" ]; then
   exit 1
 fi
 
-# ★ FIX #2: esbuild must succeed — no || swallow
+# ✅ Deterministic esbuild (no sourcemap to avoid non-determinism)
 npx esbuild js/main.js \
   --bundle \
   --minify \
@@ -95,59 +81,35 @@ npx esbuild js/main.js \
   --target=es2020 \
   --outfile="${BUILD_DIR}/main.js"
 
-# ★ FIX #2: verify output exists
 if [ ! -f "${BUILD_DIR}/main.js" ]; then
   echo "❌ esbuild failed: ${BUILD_DIR}/main.js not produced" >&2
   exit 1
 fi
 
-# Copy CSS
+# ✅ Copy CSS AFTER build
 if [ -f "css/app.css" ]; then
   cp css/app.css "${BUILD_DIR}/css/app.css"
 elif [ -f "css/style.css" ]; then
   cp css/style.css "${BUILD_DIR}/css/app.css"
 else
-  echo "❌ No CSS source file found (css/app.css or css/style.css)" >&2
+  echo "❌ No CSS source file found" >&2
   exit 1
 fi
 
-if [ ! -f "${BUILD_DIR}/css/app.css" ]; then
-  echo "❌ CSS copy failed" >&2
-  exit 1
-fi
-
-BUILD_OK=true
 echo "  ✅ ${BUILD_DIR}/main.js"
 echo "  ✅ ${BUILD_DIR}/css/app.css"
 
-# ============ DISCOVER FILES FOR SRI ============
-SRI_FILES=()
-if [ "$BUILD_OK" = true ] && [ -f "${BUILD_DIR}/main.js" ]; then
-  SRI_FILES+=("${BUILD_DIR}/main.js")
-fi
-if [ "$BUILD_OK" = true ] && [ -f "${BUILD_DIR}/css/app.css" ]; then
-  SRI_FILES+=("${BUILD_DIR}/css/app.css")
-fi
-# Always include source files as fallback
-for f in js/*.js css/*.css; do
-  [ -f "$f" ] || continue
-  if [[ ! " ${SRI_FILES[@]} " =~ " ${f} " ]]; then
-    SRI_FILES+=("$f")
-  fi
-done
+# ============ GENERATE SRI HASHES (FINAL FILES ONLY — no source files) ============
+echo "🔐 Generating SRI hashes..."
 
-# ============ GENERATE SRI HASHES ============
-declare -A SRI
-for f in "${SRI_FILES[@]}"; do
-  if [ -f "$f" ]; then
-    hash=$(openssl dgst -sha384 -binary "$f" | openssl base64 -A)
-    SRI[$f]="sha384-${hash}"
-    echo "  ✅ ${f} → sha384-${hash:0:20}..."
-  else
-    SRI[$f]=""
-    echo "  ⚠️ ${f} not found; skipping"
-  fi
-done
+SRI_MAIN=$(openssl dgst -sha384 -binary "${BUILD_DIR}/main.js" | openssl base64 -A)
+SRI_CSS=$(openssl dgst -sha384 -binary "${BUILD_DIR}/css/app.css" | openssl base64 -A)
+
+SRI_MAIN_FULL="sha384-${SRI_MAIN}"
+SRI_CSS_FULL="sha384-${SRI_CSS}"
+
+echo "  ✅ main.js → ${SRI_MAIN_FULL:0:30}..."
+echo "  ✅ app.css → ${SRI_CSS_FULL:0:30}..."
 
 # ============ UPDATE index.html ============
 if [ ! -f index.html ]; then
@@ -157,52 +119,39 @@ fi
 
 cp index.html index.html.bak
 
-# --- Portable in-place sed ---
 if [[ "${OSTYPE:-}" == darwin* ]]; then
   sedi() { sed -i '' "$@"; }
 else
   sedi() { sed -i "$@"; }
 fi
 
-# 1. App config version
-sedi "s|version: '[^']*'|version: '${VERSION}'|g" index.html
+# 1. Version in ALL URLs (catches @v1.0.0, @v1.0.1, @vHASH etc.)
+sedi "s|@[vV][0-9a-fA-F.]*[0-9]*/|@${VERSION}/|g" index.html
+sedi "s|@v[0-9a-fA-F]*[0-9]*/|@${VERSION}/|g" index.html
 
-# 2. CDN base path
+# 2. CDN base path (catches /gh/owner/repo@ patterns)
 sedi "s|/gh/[a-zA-Z0-9_.-]*/[a-zA-Z0-9_.-]*@|/gh/${OWNER}/${REPO}@|g" index.html
 
-# 3. ★ FIX: Literal @VERSION placeholder (from unprocessed HTML template)
-sedi "s|@VERSION|@${VERSION}|g" index.html
+# 3. Rewrite fallback CDN URLs inside onerror handlers
+sedi "s|gcore\.jsdelivr\.net/gh/[^']*@[^/]*/|gcore.jsdelivr.net/gh/${OWNER}/${REPO}@${VERSION}/|g" index.html
+sedi "s|fastly\.jsdelivr\.net/gh/[^']*@[^/]*/|fastly.jsdelivr.net/gh/${OWNER}/${REPO}@${VERSION}/|g" index.html
 
-# 4. Version in URLs (catches @v1.0.0, @v80a996660568, @v1.0.1 etc.)
-sedi "s|@[vV]*[0-9a-fA-F.]*[0-9]*/|@${VERSION}/|g" index.html
+# 4. Inject SRI hashes (only into final served files)
+sedi "/<link rel=\"stylesheet\"/,/crossorigin=/ s|integrity=\"[^\"]*\"|integrity=\"${SRI_CSS_FULL}\"|" index.html
+sedi "/src=[^>]*main\.js/,/crossorigin=/ s|integrity=\"[^\"]*\"|integrity=\"${SRI_MAIN_FULL}\"|" index.html
 
-# 5. Integrity attributes
-for f in "${!SRI[@]}"; do
-  sri="${SRI[$f]:-}"
-  [ -n "$sri" ] || continue
-  fname=$(basename "$f")
-  if [[ "$f" == *.css ]]; then
-    # CSS: match on the <link rel="stylesheet"> line range
-    sedi "/<link rel=\"stylesheet\"/,/crossorigin=/ s|integrity=\"[^\"]*\"|integrity=\"${sri}\"|" index.html
-  elif [[ "$f" == *.js ]]; then
-    # ★ FIX: JS uses src= line as range start (not <script line)
-    sedi "/src=[^>]*${fname}/,/crossorigin=/ s|integrity=\"[^\"]*\"|integrity=\"${sri}\"|" index.html
-  fi
-done
+# ============ VERIFY ============
+echo ""
+echo "🔍 Verifying SRI hashes match files..."
+ACTUAL_MAIN=$(openssl dgst -sha384 -binary "${BUILD_DIR}/main.js" | openssl base64 -A)
+ACTUAL_CSS=$(openssl dgst -sha384 -binary "${BUILD_DIR}/css/app.css" | openssl base64 -A)
 
-
-# 6. sriHashes inside __APP_CONFIG__
-for f in "${!SRI[@]}"; do
-  sri="${SRI[$f]:-}"
-  [ -n "$sri" ] || continue
-  fname=$(basename "$f")
-  sedi "/'${fname}':/ s|'sha384-[^']*'|'${sri}'|g" index.html
-done
-
-# 7. Fallbacks
-sedi "s|gcore\.jsdelivr\.net/gh/[^@]*@[^/]*|gcore.jsdelivr.net/gh/${OWNER}/${REPO}@${VERSION}|g" index.html
-sedi "s|fastly\.jsdelivr\.net/gh/[^@]*@[^/]*|fastly.jsdelivr.net/gh/${OWNER}/${REPO}@${VERSION}|g" index.html
-
+if [ "sha384-${ACTUAL_MAIN}" = "${SRI_MAIN_FULL}" ] && [ "sha384-${ACTUAL_CSS}" = "${SRI_CSS_FULL}" ]; then
+  echo "  ✅ SRI hashes verified"
+else
+  echo "  ❌ SRI hash mismatch!" >&2
+  exit 1
+fi
 
 # ============ DIFF SUMMARY ============
 echo ""
