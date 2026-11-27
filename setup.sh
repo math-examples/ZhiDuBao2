@@ -91,6 +91,8 @@ npx esbuild js/main.js \
   --bundle \
   --minify \
   --sourcemap \
+  --format=esm \
+  --target=es2020 \
   --outfile="${BUILD_DIR}/main.js"
 
 # ★ FIX #2: verify output exists
